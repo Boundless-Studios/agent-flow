@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Session I/O Bus" }}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1><a href="/">Session I/O Bus</a></h1>
+      <p>Local-first hub for coordinating agent sessions.</p>
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

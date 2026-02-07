@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <section class="card detail-card">
+    <div class="card-header">
+      <h2>{{ request_obj.title }}</h2>
+      <span class="priority priority-{{ request_obj.priority.value|lower }}">{{ request_obj.priority.value }}</span>
+    </div>
+
+    <p><strong>Request ID:</strong> <code>{{ request_obj.request_id }}</code></p>
+    <p><strong>Session:</strong> <code>{{ request_obj.session_id }}</code></p>
+    <p><strong>Status:</strong> <span class="state state-{{ request_obj.status.value|lower }}">{{ request_obj.status.value }}</span></p>
+
+    <div class="question-block">
+      <h3>Question</h3>
+      <p>{{ request_obj.question }}</p>
+    </div>
+
+    {% if request_obj.context_json %}
+      <div class="question-block">
+        <h3>Context JSON</h3>
+        <pre>{{ request_obj.context_json | tojson(indent=2) }}</pre>
+      </div>
+    {% endif %}
+
+    {% if request_obj.status.value == 'PENDING' %}
+      <form method="post" action="/requests/{{ request_obj.request_id }}/respond" class="response-form">
+        <label for="response_text">Response</label>
+        <textarea id="response_text" name="response_text" rows="6" required></textarea>
+
+        <label for="responder">Responder</label>
+        <input id="responder" name="responder" type="text" value="human" required />
+
+        <button type="submit">Submit Response</button>
+      </form>
+    {% else %}
+      <div class="answered-block">
+        <h3>Answered</h3>
+        <p><strong>Responder:</strong> {{ request_obj.responder }}</p>
+        <p>{{ request_obj.response_text }}</p>
+      </div>
+    {% endif %}
+
+    <p><a href="/">Back to dashboard</a></p>
+  </section>
+{% endblock %}

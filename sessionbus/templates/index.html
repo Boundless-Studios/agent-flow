@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <div class="grid">
+    <section class="card" id="sessions-section" data-refresh-url="/partials/sessions">
+      <div class="card-header">
+        <h2>Sessions</h2>
+      </div>
+
+      {% if sessions %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Session ID</th>
+                <th>State</th>
+                <th>Last Seen</th>
+                <th>Pending</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for session in sessions %}
+                <tr>
+                  <td>{{ session.display_name }}</td>
+                  <td><code>{{ session.session_id }}</code></td>
+                  <td><span class="state state-{{ session.state.value|lower }}">{{ session.state.value }}</span></td>
+                  <td>{{ session.last_seen_at.strftime('%Y-%m-%d %H:%M:%S %Z') }}</td>
+                  <td>{{ session.pending_request_count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="empty">No sessions registered yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="card" id="requests-section" data-refresh-url="/partials/requests">
+      <div class="card-header">
+        <h2>Pending Input Requests</h2>
+      </div>
+
+      {% if pending_requests %}
+        <ul class="request-list">
+          {% for request_obj in pending_requests %}
+            <li>
+              <a href="/requests/{{ request_obj.request_id }}">
+                <span class="title">{{ request_obj.title }}</span>
+                <span class="meta">
+                  <span class="priority priority-{{ request_obj.priority.value|lower }}">{{ request_obj.priority.value }}</span>
+                  <span><code>{{ request_obj.session_id }}</code></span>
+                </span>
+                <span class="question">{{ request_obj.question }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="empty">No pending requests.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <noscript>
+    <p class="noscript-note">JavaScript is disabled. Refresh the page to see updates.</p>
+  </noscript>
+{% endblock %}
