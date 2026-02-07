@@ -13,8 +13,9 @@ import uvicorn
 
 from sessionbus.api import create_app
 
-RUNTIME_DIR = Path.home() / ".sessionbus"
+RUNTIME_DIR = Path.home() / ".agentflow"
 RUNTIME_FILE = RUNTIME_DIR / "runtime.json"
+LEGACY_RUNTIME_FILE = Path.home() / ".sessionbus" / "runtime.json"
 
 
 def pick_free_port() -> int:
@@ -37,7 +38,7 @@ def wait_for_http(url: str, timeout_seconds: float = 10.0) -> None:
 
 def runtime_db_url() -> str:
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-    db_path = RUNTIME_DIR / "sessionbus.db"
+    db_path = RUNTIME_DIR / "agentflow.db"
     return f"sqlite+aiosqlite:///{db_path}"
 
 
@@ -53,22 +54,24 @@ def write_runtime_info(port: int) -> dict[str, Any]:
 
 
 def read_runtime_info() -> dict[str, Any] | None:
-    if not RUNTIME_FILE.exists():
-        return None
+    for runtime_file in (RUNTIME_FILE, LEGACY_RUNTIME_FILE):
+        if not runtime_file.exists():
+            continue
 
-    try:
-        content = json.loads(RUNTIME_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+        try:
+            content = json.loads(runtime_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
 
-    if not isinstance(content, dict):
-        return None
+        if not isinstance(content, dict):
+            continue
 
-    base_url = content.get("base_url")
-    port = content.get("port")
-    if not isinstance(base_url, str) or not isinstance(port, int):
-        return None
-    return content
+        base_url = content.get("base_url")
+        port = content.get("port")
+        if isinstance(base_url, str) and isinstance(port, int):
+            return content
+
+    return None
 
 
 def is_hub_reachable(base_url: str, timeout_seconds: float = 1.0) -> bool:
@@ -112,7 +115,7 @@ def ensure_hub_running(*, autostart: bool = True) -> dict[str, Any]:
 
     if not autostart:
         raise RuntimeError(
-            "SessionBus hub is not running. Start it with `agent-flow` or `sessionbus-hub` "
+            "AgentFlow hub is not running. Start it with `agent-flow` or `agentflow-hub` "
             "or allow MCP autostart."
         )
 

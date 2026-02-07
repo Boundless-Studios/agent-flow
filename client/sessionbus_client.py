@@ -6,29 +6,36 @@ from typing import Any
 
 import httpx
 
-RUNTIME_FILE = Path.home() / ".sessionbus" / "runtime.json"
+RUNTIME_FILES = [
+    Path.home() / ".agentflow" / "runtime.json",
+    Path.home() / ".sessionbus" / "runtime.json",  # legacy fallback
+]
 DEFAULT_BASE_URL = "http://127.0.0.1:8765"
 
 
 def discover_base_url() -> str:
-    if RUNTIME_FILE.exists():
+    for runtime_file in RUNTIME_FILES:
+        if not runtime_file.exists():
+            continue
+
         try:
-            content = json.loads(RUNTIME_FILE.read_text(encoding="utf-8"))
+            content = json.loads(runtime_file.read_text(encoding="utf-8"))
             base_url = content.get("base_url")
             if isinstance(base_url, str) and base_url:
                 return base_url.rstrip("/")
         except Exception:
-            pass
+            continue
+
     return DEFAULT_BASE_URL
 
 
-class SessionBusClient:
+class AgentFlowClient:
     def __init__(self, base_url: str | None = None, timeout: float = 30.0) -> None:
         resolved_base_url = (base_url or discover_base_url()).rstrip("/")
         self.base_url = resolved_base_url
         self._client = httpx.Client(base_url=resolved_base_url, timeout=timeout)
 
-    def __enter__(self) -> SessionBusClient:
+    def __enter__(self) -> AgentFlowClient:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -139,3 +146,7 @@ def _idempotency_headers(idempotency_key: str | None) -> dict[str, str]:
     if not idempotency_key:
         return {}
     return {"X-Idempotency-Key": idempotency_key}
+
+
+# Backward-compatible alias.
+SessionBusClient = AgentFlowClient

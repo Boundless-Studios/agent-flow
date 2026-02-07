@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sessionbus"
+name = "agentflow"
 version = "0.1.0"
-description = "Local-first Session I/O Bus for coordinating AI agent sessions"
+description = "AgentFlow: local-first coordination hub for AI agent sessions"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,6 +17,7 @@ dependencies = [
   "httpx>=0.27.0,<1.0.0",
   "pydantic>=2.7.0,<3.0.0",
   "python-multipart>=0.0.9,<1.0.0",
+  "greenlet>=3.0.0,<4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,11 @@ all = [
 
 [project.scripts]
 agent-flow = "sessionbus.main:cli"
+agentflow-launch = "sessionbus.launch:cli"
+agentflow-hub = "sessionbus.hub:cli"
+agentflow-mcp = "sessionbus.mcp_service:cli"
+# Backward-compatible aliases.
+sessionbus-launch = "sessionbus.launch:cli"
 sessionbus-hub = "sessionbus.hub:cli"
 sessionbus-mcp = "sessionbus.mcp_service:cli"
 

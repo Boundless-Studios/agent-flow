@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sessionbus.models import InputRequest, RequestStatus, Session, SessionState
+from sessionbus.models import InboxMessage, InputRequest, MessageStatus, RequestStatus, Session, SessionState
 from sessionbus.schemas import SessionPublicState, SessionSummary, StoredSessionState
 
 OFFLINE_TIMEOUT_SECONDS = 120
@@ -103,6 +103,32 @@ async def list_sessions(db: AsyncSession) -> list[SessionSummary]:
     pending_result = await db.execute(pending_stmt)
     pending_counts = {row[0]: int(row[1]) for row in pending_result.all()}
 
+    latest_response_acked: dict[str, bool] = {}
+    if sessions:
+        session_ids = [session.session_id for session in sessions]
+        latest_response_stmt = (
+            select(
+                InboxMessage.session_id,
+                InboxMessage.status,
+                InboxMessage.created_at,
+                InboxMessage.id,
+            )
+            .where(
+                InboxMessage.session_id.in_(session_ids),
+                InboxMessage.message_type == "INPUT_RESPONSE",
+            )
+            .order_by(
+                InboxMessage.session_id.asc(),
+                InboxMessage.created_at.desc(),
+                InboxMessage.id.desc(),
+            )
+        )
+        latest_response_result = await db.execute(latest_response_stmt)
+        for session_id, status, _created_at, _id in latest_response_result.all():
+            if session_id in latest_response_acked:
+                continue
+            latest_response_acked[session_id] = status == MessageStatus.ACKED
+
     return [
         SessionSummary(
             session_id=session.session_id,
@@ -110,6 +136,10 @@ async def list_sessions(db: AsyncSession) -> list[SessionSummary]:
             state=_compute_public_state(session),
             last_seen_at=session.last_seen_at,
             pending_request_count=pending_counts.get(session.session_id, 0),
+            response_acknowledged=(
+                pending_counts.get(session.session_id, 0) == 0
+                and latest_response_acked.get(session.session_id, False)
+            ),
             tenant_id=session.tenant_id,
             metadata=session.session_metadata,
         )

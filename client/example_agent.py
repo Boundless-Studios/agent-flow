@@ -3,12 +3,12 @@ from __future__ import annotations
 import argparse
 import time
 
-from sessionbus_client import SessionBusClient
+from sessionbus_client import AgentFlowClient
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Example SessionBus agent loop")
-    parser.add_argument("--base-url", default=None, help="SessionBus base URL (default: discover from ~/.sessionbus/runtime.json)")
+    parser = argparse.ArgumentParser(description="Example AgentFlow agent loop")
+    parser.add_argument("--base-url", default=None, help="AgentFlow base URL (default: discover from ~/.agentflow/runtime.json)")
     parser.add_argument("--display-name", default="Example Agent", help="Display name used for session registration")
     return parser.parse_args()
 
@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    with SessionBusClient(base_url=args.base_url) as client:
+    with AgentFlowClient(base_url=args.base_url) as client:
         session_id = client.register_session(
             display_name=args.display_name,
             metadata={"kind": "example", "script": "client/example_agent.py"},
@@ -37,7 +37,7 @@ def main() -> None:
             tags=["demo", "human-input"],
         )
         print(f"Created input request: {request_id}")
-        print("Open the SessionBus UI, answer this request, then return here.")
+        print("Open the AgentFlow UI, answer this request, then return here.")
 
         waiting = True
         while waiting:

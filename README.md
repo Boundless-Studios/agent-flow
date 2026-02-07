@@ -1,226 +1,263 @@
-# Session I/O Bus
+# AgentFlow
 
-Local-first standalone hub for coordinating many AI agent sessions that may need human input.
+Local-first hub for coordinating AI agent sessions that need human input. Connect multiple agents (Claude Code, Codex, custom scripts) to a single dashboard where you can monitor sessions and respond to requests.
 
-- FastAPI async backend
-- SQLite persistence via SQLAlchemy 2.0
-- Server-rendered UI (Jinja2 + minimal JS)
-- SSE live updates for dashboard refresh
-- Desktop window wrapper via pywebview
-- MCP service mode (stdio)
-- Python client library + example agent loop
-
-## Requirements
-
-- Python 3.11+
-- `make` (recommended)
-
-## Quick Start (Recommended)
+## Setup
 
 ```bash
-make setup
-make launch
+git clone <repo-url> && cd agent-overflow
+make setup    # Creates venv, installs all dependencies
+make launch   # Starts the hub in background
+```
+
+Verify it's running:
+
+```bash
 make status
 ```
 
-Then open the desktop UI (optional):
+## Testing the Flow
+
+Run the example agent to see the full human-in-the-loop cycle:
+
+```bash
+# Terminal 1: Start the hub (if not already running)
+make launch
+
+# Terminal 2: Run example agent
+./.venv/bin/python client/example_agent.py
+```
+
+The agent will create a request and wait. Open the dashboard to respond:
 
 ```bash
 make launch-ui
 ```
 
-Run tests:
+Submit a response in the UI, then watch Terminal 2 receive it and continue.
 
-```bash
-make test
-```
+## Integrating with Agents
 
-Shutdown background hub:
+### Claude Code / Codex (via MCP)
 
-```bash
-make shutdown
-```
-
-## Install Modes
-
-- Core only:
-
-```bash
-pip install -e .
-```
-
-- Development + tests:
-
-```bash
-pip install -e ".[dev]"
-```
-
-- Desktop UI support:
-
-```bash
-pip install -e ".[desktop]"
-```
-
-- MCP support:
-
-```bash
-pip install -e ".[mcp]"
-```
-
-- Everything:
-
-```bash
-pip install -e ".[all]"
-```
-
-## Makefile Targets
-
-```bash
-make help
-make setup
-make setup-core
-make setup-dev
-make setup-desktop
-make setup-mcp
-make setup-all
-make readme
-make test
-make launch
-make launch-ui
-make mcp
-make status
-make logs
-make shutdown
-make clean
-```
-
-## Run (Desktop App)
-
-```bash
-agent-flow
-```
-
-This starts the hub server on `127.0.0.1` with a free local port, writes runtime metadata to `~/.sessionbus/runtime.json`, and opens a desktop window.
-
-Equivalent command:
-
-```bash
-python -m sessionbus.main
-```
-
-## Run (Headless Hub Only)
-
-```bash
-sessionbus-hub
-```
-
-This runs only the local FastAPI hub on `127.0.0.1` (no desktop window).
-
-## Run as MCP Service
-
-```bash
-sessionbus-mcp
-```
-
-Behavior:
-- Starts/attaches to the local SessionBus hub automatically.
-- Serves MCP over stdio.
-- Exposes tools for session registration, heartbeat/state, request create/respond, and inbox poll/ack.
-
-Disable hub autostart (require an already-running hub):
-
-```bash
-SESSIONBUS_MCP_AUTOSTART=0 sessionbus-mcp
-```
-
-### MCP Client Config Example (Claude Desktop-style)
+Add to your MCP config (`~/.config/claude/mcp.json` or similar):
 
 ```json
 {
   "mcpServers": {
-    "sessionbus": {
-      "command": "sessionbus-mcp"
+    "agentflow": {
+      "command": "/path/to/agent-overflow/.venv/bin/agentflow-mcp"
     }
   }
 }
 ```
 
-## Run the Example Agent
+The MCP server auto-starts the hub if needed. Your agent can then use these tools:
 
-In a second terminal:
+| Tool | Description |
+|------|-------------|
+| `register_session` | Register a new agent session |
+| `create_input_request` | Ask for human input (moves session to WAITING_FOR_INPUT) |
+| `poll_inbox` | Check for responses |
+| `ack_inbox_message` | Acknowledge received message |
+| `heartbeat_session` | Update session state/metadata |
+| `list_sessions` | View all sessions |
+| `hub_status` | Check hub connection |
 
-```bash
-python client/example_agent.py
-```
-
-The script:
-1. Registers a session
-2. Performs work
-3. Creates an input request (session becomes `WAITING_FOR_INPUT`)
-4. Polls inbox until human response arrives
-5. ACKs inbox message and continues to `DONE`
-
-## API Highlights
-
-- `POST /api/sessions/register`
-- `POST /api/sessions/{session_id}/heartbeat`
-- `POST /api/sessions/{session_id}/state`
-- `GET /api/sessions`
-- `POST /api/sessions/{session_id}/requests`
-- `GET /api/requests?status=PENDING`
-- `GET /api/requests/{request_id}`
-- `POST /api/requests/{request_id}/respond`
-- `GET /api/sessions/{session_id}/inbox?timeout=30`
-- `POST /api/sessions/{session_id}/inbox/{message_id}/ack`
-- `GET /api/events` (SSE)
-
-Idempotency is supported on request/response creation via `X-Idempotency-Key`.
-
-## Integrating Your Agents
-
-Use `client/sessionbus_client.py` or call APIs directly.
+### Python Client
 
 ```python
-from client.sessionbus_client import SessionBusClient
+from client.sessionbus_client import AgentFlowClient
 
-client = SessionBusClient()  # auto-discovers base_url from ~/.sessionbus/runtime.json
-session_id = client.register_session("Cloud Agent")
+with AgentFlowClient() as client:
+    session_id = client.register_session("My Agent")
 
-request_id = client.create_request(
-    session_id,
-    title="Need approval",
-    question="Proceed with migration?",
-    priority="URGENT",
-)
+    # Do work...
+    client.heartbeat(session_id, state="WORKING")
 
-while True:
-    messages = client.poll_inbox(session_id, timeout=30)
-    if not messages:
-        client.heartbeat(session_id, state="WAITING_FOR_INPUT")
-        continue
+    # Need human input
+    request_id = client.create_request(
+        session_id,
+        title="Approval needed",
+        question="Proceed with deployment?",
+        priority="URGENT",
+    )
 
-    for msg in messages:
-        if msg["type"] == "INPUT_RESPONSE" and msg["payload"]["request_id"] == request_id:
-            human_answer = msg["payload"]["response_text"]
-            client.ack_message(session_id, msg["message_id"])
-            # continue your agent loop using human_answer
-            break
+    # Wait for response
+    while True:
+        messages = client.poll_inbox(session_id, timeout=30)
+        for msg in messages:
+            if msg["type"] == "INPUT_RESPONSE":
+                answer = msg["payload"]["response_text"]
+                client.ack_message(session_id, msg["message_id"])
+                break
 ```
 
-## Major Dependencies
+The client auto-discovers the hub URL from `~/.agentflow/runtime.json` (falls back to legacy `~/.sessionbus/runtime.json`).
 
-Core runtime:
-- `fastapi`: API + server-side routes
-- `sqlalchemy` + `aiosqlite`: async persistence and data model
-- `uvicorn`: ASGI server runtime
-- `jinja2`: UI templates
-- `httpx`: client integration
-- `pydantic`: request/response validation
+---
 
-Optional:
-- `pywebview` (`[desktop]`): desktop app window wrapper
-- `mcp` (`[mcp]`): MCP server transport/tooling
-- `pytest` (`[dev]`): tests
+## MCP Server Reference
+
+The MCP server (`agentflow-mcp`) provides Model Context Protocol access to AgentFlow.
+
+### Running the MCP Server
+
+```bash
+# Auto-starts hub if not running
+./.venv/bin/agentflow-mcp
+
+# Require existing hub (no autostart)
+SESSIONBUS_MCP_AUTOSTART=0 agentflow-mcp
+```
+
+### Available MCP Tools
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `hub_status` | — | Hub connection info and session count |
+| `register_session` | `display_name`, `tenant_id?`, `metadata?` | Register new session |
+| `heartbeat_session` | `session_id`, `state?`, `metadata?` | Update session heartbeat |
+| `set_session_state` | `session_id`, `state` | Set state (WORKING, WAITING_FOR_INPUT, DONE, ERROR) |
+| `list_sessions` | — | List all sessions with state and request counts |
+| `create_input_request` | `session_id`, `title`, `question`, `priority?`, `tags?` | Create human input request |
+| `list_requests` | `status?` | List requests (default: PENDING) |
+| `get_request` | `request_id` | Get request details |
+| `respond_to_request` | `request_id`, `response_text`, `responder?` | Answer a request |
+| `poll_inbox` | `session_id`, `timeout?` | Long-poll for messages |
+| `ack_inbox_message` | `session_id`, `message_id` | Acknowledge message |
+
+### MCP Resource
+
+- `agentflow://runtime` — Hub connection info (base_url)
+
+---
+
+## Running Modes
+
+### Desktop + MCP (Combined)
+
+```bash
+./.venv/bin/agentflow-launch
+# or
+make launch-all
+```
+
+Starts the hub, opens the desktop window, and runs MCP as a background sidecar for local notification/chat workflows.
+
+### Desktop App (Hub + UI)
+
+```bash
+./.venv/bin/agent-flow
+# or
+make launch-ui
+```
+
+Starts the hub and opens a desktop window (requires `pywebview`).
+
+### Headless Hub Only
+
+```bash
+./.venv/bin/agentflow-hub
+# or
+make launch
+```
+
+Runs the API server without UI. Access the web dashboard at the URL shown in `~/.agentflow/runtime.json`.
+
+### MCP Service
+
+```bash
+./.venv/bin/agentflow-mcp
+# or
+make mcp
+```
+
+Runs the MCP server over stdio for agent integration.
+
+---
+
+## Commands Reference
+
+```bash
+# Setup
+make setup          # Full install (all extras)
+make setup-core     # Core runtime only
+make setup-dev      # Core + pytest
+make setup-desktop  # Add pywebview
+make setup-mcp      # Add MCP support
+
+# Operations
+make launch         # Start headless hub (background)
+make launch-ui      # Start desktop app
+make launch-all     # Start desktop app + MCP sidecar
+make mcp            # Run MCP server
+make status         # Check hub status
+make logs           # Tail hub logs
+make shutdown       # Stop background hub
+make test           # Run tests
+make clean          # Remove runtime files
+```
+
+## Install Modes
+
+```bash
+pip install -e .            # Core only
+pip install -e ".[dev]"     # + pytest
+pip install -e ".[desktop]" # + pywebview
+pip install -e ".[mcp]"     # + mcp
+pip install -e ".[all]"     # Everything
+```
+
+---
+
+## API Reference
+
+All endpoints are served from the hub's base URL (default `127.0.0.1`, port in runtime.json).
+
+### Sessions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/sessions/register` | Register new session |
+| POST | `/api/sessions/{id}/heartbeat` | Send heartbeat |
+| POST | `/api/sessions/{id}/state` | Set session state |
+| GET | `/api/sessions` | List all sessions |
+
+### Requests
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/sessions/{id}/requests` | Create input request |
+| GET | `/api/requests` | List requests (filter by `?status=`) |
+| GET | `/api/requests/{id}` | Get request details |
+| POST | `/api/requests/{id}/respond` | Submit response |
+
+### Inbox
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/sessions/{id}/inbox` | Poll inbox (`?timeout=30`) |
+| POST | `/api/sessions/{id}/inbox/{msg_id}/ack` | Acknowledge message |
+
+### Events
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/events` | SSE stream for live updates |
+
+**Idempotency:** Use `X-Idempotency-Key` header on request/response creation.
+
+---
+
+## Architecture
+
+- **FastAPI** async backend
+- **SQLite** persistence (SQLAlchemy 2.0 + aiosqlite)
+- **Jinja2** server-rendered UI with minimal JS
+- **SSE** live dashboard updates
+- **pywebview** desktop wrapper (optional)
+- **MCP** stdio transport for agent integration
 
 ## License
 

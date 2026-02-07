@@ -15,7 +15,7 @@ def run() -> None:
         ) from exc
 
     webview.create_window(
-        title="Session I/O Bus",
+        title="AgentFlow",
         url=base_url,
         width=1180,
         height=820,

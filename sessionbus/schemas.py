@@ -51,6 +51,7 @@ class SessionSummary(BaseModel):
     state: SessionPublicState
     last_seen_at: datetime
     pending_request_count: int
+    response_acknowledged: bool = False
     tenant_id: str | None = None
     metadata: dict[str, Any] | None = None
 

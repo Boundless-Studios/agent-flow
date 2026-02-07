@@ -137,7 +137,7 @@ async def lifespan(_: FastAPI):
 def create_app(database_url: str | None = None) -> FastAPI:
     configure_database(database_url)
 
-    app = FastAPI(title="Session I/O Bus", lifespan=lifespan)
+    app = FastAPI(title="AgentFlow", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
     api_router = APIRouter(prefix="/api")

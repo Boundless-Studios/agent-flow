@@ -13,10 +13,10 @@ try:
     from mcp.server.fastmcp import FastMCP
 except Exception as exc:  # pragma: no cover - import error path depends on environment
     raise RuntimeError(
-        "The `mcp` package is required for SessionBus MCP mode. Install with `pip install -e \".[mcp]\"`."
+        "The `mcp` package is required for AgentFlow MCP mode. Install with `pip install -e \".[mcp]\"`."
     ) from exc
 
-mcp = FastMCP("SessionBus")
+mcp = FastMCP("AgentFlow")
 _BASE_URL: str | None = None
 
 
@@ -55,7 +55,7 @@ def _request(
 
 @mcp.tool()
 def hub_status() -> dict[str, Any]:
-    """Return SessionBus hub connection information for this MCP process."""
+    """Return AgentFlow hub connection information for this MCP process."""
     base_url = _get_base_url()
     sessions = _request("GET", "/api/sessions")
     return {
@@ -70,7 +70,7 @@ def register_session(
     tenant_id: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Register a new Cloud/agent session in SessionBus."""
+    """Register a new Cloud/agent session in AgentFlow."""
     payload = {
         "display_name": display_name,
         "tenant_id": tenant_id,
@@ -179,7 +179,7 @@ def ack_inbox_message(session_id: str, message_id: str) -> dict[str, Any]:
     return _request("POST", f"/api/sessions/{session_id}/inbox/{message_id}/ack")
 
 
-@mcp.resource("sessionbus://runtime")
+@mcp.resource("agentflow://runtime")
 def runtime_resource() -> str:
     """Expose hub runtime connection info as an MCP resource."""
     return json.dumps({"base_url": _get_base_url()}, indent=2)
