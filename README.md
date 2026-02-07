@@ -1,4 +1,4 @@
-# AgentFlow
+# AgentFlow — Local-first hub for coordinating agent sessions.
 
 Local-first hub for coordinating AI agent sessions that need human input. Connect multiple agents (Claude Code, Codex, custom scripts) to a single dashboard where you can monitor sessions and respond to requests.
 
