@@ -24,7 +24,12 @@
                 <tr>
                   <td>{{ session.display_name }}</td>
                   <td><code>{{ session.session_id }}</code></td>
-                  <td><span class="state state-{{ session.state.value|lower }}">{{ session.state.value }}</span></td>
+                  <td>
+                    <span class="state state-{{ session.state.value|lower }}">{{ session.state.value }}</span>
+                    {% if session.response_acknowledged %}
+                      <span class="state state-ack">ACK</span>
+                    {% endif %}
+                  </td>
                   <td>{{ session.last_seen_at.strftime('%Y-%m-%d %H:%M:%S %Z') }}</td>
                   <td>{{ session.pending_request_count }}</td>
                 </tr>
@@ -45,15 +50,27 @@
       {% if pending_requests %}
         <ul class="request-list">
           {% for request_obj in pending_requests %}
-            <li>
-              <a href="/requests/{{ request_obj.request_id }}">
-                <span class="title">{{ request_obj.title }}</span>
-                <span class="meta">
-                  <span class="priority priority-{{ request_obj.priority.value|lower }}">{{ request_obj.priority.value }}</span>
-                  <span><code>{{ request_obj.session_id }}</code></span>
-                </span>
-                <span class="question">{{ request_obj.question }}</span>
-              </a>
+            <li class="request-item">
+              <details class="request-entry">
+                <summary>
+                  <span class="title">{{ request_obj.title }}</span>
+                  <span class="meta">
+                    <span class="priority priority-{{ request_obj.priority.value|lower }}">{{ request_obj.priority.value }}</span>
+                    <span><code>{{ request_obj.session_id }}</code></span>
+                  </span>
+                  <span class="question">{{ request_obj.question }}</span>
+                </summary>
+                <form class="inline-response-form" data-request-id="{{ request_obj.request_id }}">
+                  <label for="response-{{ request_obj.request_id }}">Response</label>
+                  <textarea id="response-{{ request_obj.request_id }}" name="response_text" rows="3" required></textarea>
+                  <input name="responder" type="hidden" value="human" />
+                  <div class="inline-response-actions">
+                    <button type="submit">Send</button>
+                    <a href="/requests/{{ request_obj.request_id }}">Details</a>
+                  </div>
+                  <p class="inline-response-status" aria-live="polite"></p>
+                </form>
+              </details>
             </li>
           {% endfor %}
         </ul>

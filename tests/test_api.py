@@ -41,6 +41,7 @@ def test_request_response_inbox_flow(client: TestClient) -> None:
     [session] = [item for item in sessions.json() if item["session_id"] == session_id]
     assert session["state"] == "WAITING_FOR_INPUT"
     assert session["pending_request_count"] == 1
+    assert session["response_acknowledged"] is False
 
     respond = client.post(
         f"/api/requests/{request_id}/respond",
@@ -48,6 +49,15 @@ def test_request_response_inbox_flow(client: TestClient) -> None:
     )
     assert respond.status_code == 200
     assert respond.json()["status"] == "ANSWERED"
+
+    sessions_after_response = client.get("/api/sessions")
+    assert sessions_after_response.status_code == 200
+    [session_after_response] = [
+        item for item in sessions_after_response.json() if item["session_id"] == session_id
+    ]
+    assert session_after_response["state"] == "WORKING"
+    assert session_after_response["pending_request_count"] == 0
+    assert session_after_response["response_acknowledged"] is False
 
     poll = client.get(f"/api/sessions/{session_id}/inbox", params={"timeout": 0})
     assert poll.status_code == 200
@@ -61,9 +71,29 @@ def test_request_response_inbox_flow(client: TestClient) -> None:
     assert ack.status_code == 200
     assert ack.json()["status"] == "ACKED"
 
+    sessions_after_ack = client.get("/api/sessions")
+    assert sessions_after_ack.status_code == 200
+    [session_after_ack] = [item for item in sessions_after_ack.json() if item["session_id"] == session_id]
+    assert session_after_ack["response_acknowledged"] is True
+
     poll_after_ack = client.get(f"/api/sessions/{session_id}/inbox", params={"timeout": 0})
     assert poll_after_ack.status_code == 200
     assert poll_after_ack.json()["messages"] == []
+
+    create_second_request = client.post(
+        f"/api/sessions/{session_id}/requests",
+        json={"title": "Need input again", "question": "Choose next step"},
+    )
+    assert create_second_request.status_code == 200
+
+    sessions_after_second_request = client.get("/api/sessions")
+    assert sessions_after_second_request.status_code == 200
+    [session_after_second_request] = [
+        item for item in sessions_after_second_request.json() if item["session_id"] == session_id
+    ]
+    assert session_after_second_request["state"] == "WAITING_FOR_INPUT"
+    assert session_after_second_request["pending_request_count"] == 1
+    assert session_after_second_request["response_acknowledged"] is False
 
 
 def test_idempotency_on_request_creation(client: TestClient) -> None:

@@ -109,17 +109,38 @@ th {
   gap: 8px;
 }
 
-.request-list li a {
-  display: grid;
-  gap: 4px;
+.request-entry {
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px;
-  text-decoration: none;
-  color: inherit;
+  background: #ffffff;
 }
 
-.request-list li a:hover {
+.request-entry summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.request-entry summary::-webkit-details-marker {
+  display: none;
+}
+
+.request-entry summary::after {
+  content: "Reply";
+  justify-self: end;
+  color: var(--blue);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.request-entry[open] summary::after {
+  content: "Close";
+}
+
+.request-entry:hover,
+.request-entry[open] {
   border-color: var(--blue);
 }
 
@@ -137,6 +158,39 @@ th {
 
 .request-list .question {
   color: #111827;
+}
+
+.inline-response-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.inline-response-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inline-response-actions a {
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.inline-response-actions a:hover {
+  text-decoration: underline;
+}
+
+.inline-response-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.inline-response-status.error {
+  color: var(--red);
 }
 
 .state,
@@ -172,6 +226,11 @@ th {
 .priority-urgent {
   color: var(--red);
   background: #fee2e2;
+}
+
+.state-ack {
+  color: #065f46;
+  background: #d1fae5;
 }
 
 .empty,
