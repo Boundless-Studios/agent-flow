@@ -65,11 +65,17 @@ REQUESTS_PARTIAL_TEMPLATE = TEMPLATES.env.from_string(
     """
 <div class="card-header">
   <h2>Pending Input Requests</h2>
+  <div class="notify-controls">
+    <button type="button" class="notifications-enable" data-enable-notifications hidden>
+      Enable Desktop Notifications
+    </button>
+    <span class="notifications-state" data-notification-state></span>
+  </div>
 </div>
 {% if pending_requests %}
   <ul class="request-list">
     {% for request_obj in pending_requests %}
-      <li class="request-item">
+      <li class="request-item" data-request-id="{{ request_obj.request_id }}">
         <details class="request-entry">
           <summary>
             <span class="title">{{ request_obj.title }}</span>
@@ -77,8 +83,14 @@ REQUESTS_PARTIAL_TEMPLATE = TEMPLATES.env.from_string(
               <span class="priority priority-{{ request_obj.priority.value|lower }}">{{ request_obj.priority.value }}</span>
               <span><code>{{ request_obj.session_id }}</code></span>
             </span>
-            <span class="question">{{ request_obj.question }}</span>
+            <div class="question">{{ request_obj.question }}</div>
           </summary>
+          {% if request_obj.context_json is not none %}
+            <div class="request-context">
+              <p class="request-context-label">Context</p>
+              <pre>{{ request_obj.context_json | tojson(indent=2) }}</pre>
+            </div>
+          {% endif %}
           <form class="inline-response-form" data-request-id="{{ request_obj.request_id }}">
             <label for="response-{{ request_obj.request_id }}">Response</label>
             <textarea id="response-{{ request_obj.request_id }}" name="response_text" rows="3" required></textarea>

@@ -9,7 +9,8 @@ from sessionbus.api import create_app
 
 
 @pytest.fixture
-def client(tmp_path: Path) -> TestClient:
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("AGENTFLOW_DESKTOP_NOTIFICATIONS", "0")
     db_file = tmp_path / "sessionbus-test.db"
     app = create_app(database_url=f"sqlite+aiosqlite:///{db_file}")
     with TestClient(app) as test_client:
@@ -115,3 +116,27 @@ def test_idempotency_on_request_creation(client: TestClient) -> None:
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json()["request_id"] == second.json()["request_id"]
+
+
+def test_requests_partial_preserves_multiline_format_and_context(client: TestClient) -> None:
+    register = client.post("/api/sessions/register", json={"display_name": "Agent Gamma"})
+    session_id = register.json()["session_id"]
+
+    create_request = client.post(
+        f"/api/sessions/{session_id}/requests",
+        json={
+            "title": "Formatted request",
+            "question": "Line one\n\n- item A\n- item B",
+            "context_json": {"source": "agent", "steps": ["one", "two"]},
+        },
+    )
+    assert create_request.status_code == 200
+
+    partial = client.get("/partials/requests")
+    assert partial.status_code == 200
+    body = partial.text
+    assert "class=\"question\"" in body
+    assert "Line one" in body
+    assert "item A" in body
+    assert "request-context" in body
+    assert "Context" in body

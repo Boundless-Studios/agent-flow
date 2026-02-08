@@ -72,6 +72,34 @@ code {
   margin-bottom: 12px;
 }
 
+.notify-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notifications-enable {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.notifications-enable:hover {
+  background: #dbeafe;
+}
+
+.notifications-state {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.notifications-state.error {
+  color: var(--red);
+}
+
 .card h2,
 .card h3 {
   margin: 0;
@@ -158,6 +186,18 @@ th {
 
 .request-list .question {
   color: #111827;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.request-context {
+  padding: 0 10px 10px;
+}
+
+.request-context-label {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .inline-response-form {

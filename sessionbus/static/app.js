@@ -1,5 +1,121 @@
 (function () {
   const REFRESH_INTERVAL_MS = 10000;
+  let pendingSnapshotInitialized = false;
+  let knownPendingRequestIds = new Set();
+
+  function desktopNotificationsSupported() {
+    return typeof window.Notification !== "undefined";
+  }
+
+  function syncNotificationControls() {
+    const enableButton = document.querySelector("[data-enable-notifications]");
+    const state = document.querySelector("[data-notification-state]");
+    if (!(enableButton instanceof HTMLButtonElement) || !(state instanceof HTMLElement)) {
+      return;
+    }
+
+    if (!desktopNotificationsSupported()) {
+      enableButton.hidden = true;
+      state.classList.add("error");
+      state.textContent = "Web notifications unavailable. Native desktop alerts will be used when available.";
+      return;
+    }
+
+    state.classList.remove("error");
+    if (Notification.permission === "granted") {
+      enableButton.hidden = true;
+      state.textContent = "Desktop notifications are enabled.";
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      enableButton.hidden = true;
+      state.classList.add("error");
+      state.textContent = "Browser notifications are blocked. Native desktop alerts will be used when available.";
+      return;
+    }
+
+    enableButton.hidden = false;
+    state.textContent = "Enable notifications for newly pending requests.";
+  }
+
+  async function requestNotificationPermission() {
+    if (!desktopNotificationsSupported()) {
+      return;
+    }
+
+    try {
+      await Notification.requestPermission();
+    } catch (_err) {
+      // Keep UI state unchanged if permission flow fails.
+    }
+    syncNotificationControls();
+  }
+
+  function collectPendingRequests() {
+    const requests = new Map();
+    const items = document.querySelectorAll(".request-item[data-request-id]");
+    for (const item of items) {
+      const requestId = item.getAttribute("data-request-id");
+      if (!requestId) {
+        continue;
+      }
+
+      const title = item.querySelector(".title")?.textContent?.trim() || "Input Request";
+      const priority = item.querySelector(".priority")?.textContent?.trim() || "NORMAL";
+      const sessionId = item.querySelector("code")?.textContent?.trim() || "";
+      const question = item.querySelector(".question")?.textContent?.trim() || "";
+      requests.set(requestId, { requestId, title, priority, sessionId, question });
+    }
+    return requests;
+  }
+
+  function formatNotificationBody(requestInfo) {
+    const lines = [];
+    lines.push(`Priority: ${requestInfo.priority}`);
+    if (requestInfo.sessionId) {
+      lines.push(`Session: ${requestInfo.sessionId}`);
+    }
+    if (requestInfo.question) {
+      const normalized = requestInfo.question.replace(/\s+/g, " ").trim();
+      lines.push(normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized);
+    }
+    return lines.join("\n");
+  }
+
+  function notifyForNewPendingRequests(currentPending) {
+    if (!pendingSnapshotInitialized) {
+      knownPendingRequestIds = new Set(currentPending.keys());
+      pendingSnapshotInitialized = true;
+      return;
+    }
+
+    if (!desktopNotificationsSupported() || Notification.permission !== "granted") {
+      knownPendingRequestIds = new Set(currentPending.keys());
+      return;
+    }
+
+    for (const [requestId, requestInfo] of currentPending.entries()) {
+      if (knownPendingRequestIds.has(requestId)) {
+        continue;
+      }
+      try {
+        new Notification(`AgentFlow: ${requestInfo.title}`, {
+          body: formatNotificationBody(requestInfo),
+          tag: `agentflow-request-${requestId}`,
+        });
+      } catch (_err) {
+        // Ignore notification API failures and keep the dashboard responsive.
+      }
+    }
+
+    knownPendingRequestIds = new Set(currentPending.keys());
+  }
+
+  function postRefreshSync() {
+    syncNotificationControls();
+    notifyForNewPendingRequests(collectPendingRequests());
+  }
 
   async function refreshSections() {
     const sections = document.querySelectorAll("[data-refresh-url]");
@@ -25,6 +141,8 @@
         }
       })
     );
+
+    postRefreshSync();
   }
 
   function attachEventStream() {
@@ -110,6 +228,21 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("click", function (event) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const button = target.closest("[data-enable-notifications]");
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      void requestNotificationPermission();
+    });
+
     document.addEventListener("submit", function (event) {
       const target = event.target;
       if (!(target instanceof HTMLFormElement) || !target.classList.contains("inline-response-form")) {
@@ -118,6 +251,8 @@
       event.preventDefault();
       void submitInlineResponse(target);
     });
+
+    postRefreshSync();
 
     const sseAttached = attachEventStream();
     if (!sseAttached) {

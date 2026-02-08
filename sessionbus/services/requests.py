@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sessionbus.models import IdempotencyKey, InputRequest, RequestPriority, RequestStatus, SessionState
 from sessionbus.schemas import InputRequestCreateRequest, InputRequestResponseRequest
 from sessionbus.services import inbox
+from sessionbus.services import notifications
 from sessionbus.services.events import event_bus
 from sessionbus.services.sessions import get_session
 
@@ -85,6 +86,13 @@ async def create_request(
             "session_id": request_obj.session_id,
             "priority": request_obj.priority.value,
         },
+    )
+    notifications.notify_pending_input_request(
+        request_id=request_obj.request_id,
+        session_id=request_obj.session_id,
+        title=request_obj.title,
+        question=request_obj.question,
+        priority=request_obj.priority.value,
     )
     return request_obj, False
 
