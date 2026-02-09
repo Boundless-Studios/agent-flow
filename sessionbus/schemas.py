@@ -78,6 +78,11 @@ class InputRequestResponseResponse(BaseModel):
     status: RequestStatus
 
 
+class InputRequestDismissResponse(BaseModel):
+    request_id: str
+    status: RequestStatus
+
+
 class InputRequestView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -261,6 +261,11 @@ th {
   background: #ccfbf1;
 }
 
+.state-dismissed {
+  color: #334155;
+  background: #e2e8f0;
+}
+
 .state-error,
 .state-offline,
 .priority-urgent {
@@ -327,6 +332,16 @@ button {
 
 button:hover {
   background: #1d4ed8;
+}
+
+button.button-secondary {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+button.button-secondary:hover {
+  background: #eef2f7;
 }
 
 @media (max-width: 640px) {

@@ -33,11 +33,19 @@
 
         <button type="submit">Submit Response</button>
       </form>
-    {% else %}
+      <form method="post" action="/requests/{{ request_obj.request_id }}/dismiss" class="response-form">
+        <button type="submit" class="button-secondary">Dismiss This Request</button>
+      </form>
+    {% elif request_obj.status.value == 'ANSWERED' %}
       <div class="answered-block">
         <h3>Answered</h3>
         <p><strong>Responder:</strong> {{ request_obj.responder }}</p>
         <p>{{ request_obj.response_text }}</p>
+      </div>
+    {% else %}
+      <div class="answered-block">
+        <h3>Dismissed</h3>
+        <p>This request was dismissed and removed from the pending queue.</p>
       </div>
     {% endif %}
 

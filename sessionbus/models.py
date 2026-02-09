@@ -33,6 +33,7 @@ class RequestPriority(str, Enum):
 class RequestStatus(str, Enum):
     PENDING = "PENDING"
     ANSWERED = "ANSWERED"
+    DISMISSED = "DISMISSED"
 
 
 class MessageStatus(str, Enum):

@@ -78,6 +78,7 @@
                   <input name="responder" type="hidden" value="human" />
                   <div class="inline-response-actions">
                     <button type="submit">Send</button>
+                    <button type="button" class="button-secondary inline-dismiss-button" data-request-id="{{ request_obj.request_id }}">Dismiss</button>
                     <a href="/requests/{{ request_obj.request_id }}">Details</a>
                   </div>
                   <p class="inline-response-status" aria-live="polite"></p>

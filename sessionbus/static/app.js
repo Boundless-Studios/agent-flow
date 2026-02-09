@@ -227,10 +227,55 @@
     }
   }
 
+  async function dismissPendingRequest(requestId, statusEl) {
+    if (!requestId) {
+      return;
+    }
+
+    if (statusEl instanceof HTMLElement) {
+      statusEl.classList.remove("error");
+      statusEl.textContent = "Dismissing request...";
+    }
+
+    try {
+      const response = await fetch(`/api/requests/${encodeURIComponent(requestId)}/dismiss`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed with status ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (statusEl instanceof HTMLElement) {
+        statusEl.textContent = payload.status === "DISMISSED" ? "Dismissed." : "Already handled.";
+      }
+      await refreshSections();
+    } catch (_err) {
+      if (statusEl instanceof HTMLElement) {
+        statusEl.classList.add("error");
+        statusEl.textContent = "Failed to dismiss. Please retry.";
+      }
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("click", function (event) {
       const target = event.target;
       if (!(target instanceof Element)) {
+        return;
+      }
+
+      const dismissButton = target.closest(".inline-dismiss-button");
+      if (dismissButton instanceof HTMLButtonElement) {
+        event.preventDefault();
+        const requestId = dismissButton.dataset.requestId || "";
+        const form = dismissButton.closest(".inline-response-form");
+        const statusEl = form ? form.querySelector(".inline-response-status") : null;
+        dismissButton.disabled = true;
+        void dismissPendingRequest(requestId, statusEl).finally(function () {
+          dismissButton.disabled = false;
+        });
         return;
       }
 

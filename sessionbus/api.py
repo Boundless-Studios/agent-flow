@@ -97,6 +97,7 @@ REQUESTS_PARTIAL_TEMPLATE = TEMPLATES.env.from_string(
             <input name="responder" type="hidden" value="human" />
             <div class="inline-response-actions">
               <button type="submit">Send</button>
+              <button type="button" class="button-secondary inline-dismiss-button" data-request-id="{{ request_obj.request_id }}">Dismiss</button>
               <a href="/requests/{{ request_obj.request_id }}">Details</a>
             </div>
             <p class="inline-response-status" aria-live="polite"></p>
@@ -274,6 +275,23 @@ def create_app(database_url: str | None = None) -> FastAPI:
             status=request_obj.status,
         )
 
+    @api_router.post("/requests/{request_id}/dismiss", response_model=schemas.InputRequestDismissResponse)
+    async def dismiss_request(
+        request_id: str,
+        db: AsyncSession = Depends(get_session),
+    ) -> schemas.InputRequestDismissResponse:
+        request_obj, _ = await requests_service.dismiss_request(
+            db,
+            request_id=request_id,
+        )
+        if request_obj is None:
+            raise HTTPException(status_code=404, detail="Request not found")
+
+        return schemas.InputRequestDismissResponse(
+            request_id=request_obj.request_id,
+            status=request_obj.status,
+        )
+
     @api_router.get("/sessions/{session_id}/inbox", response_model=schemas.InboxPollResponse)
     async def poll_inbox(
         session_id: str,
@@ -376,6 +394,20 @@ def create_app(database_url: str | None = None) -> FastAPI:
             request_id=request_id,
             payload=payload,
             idempotency_key=None,
+        )
+        if request_obj is None:
+            raise HTTPException(status_code=404, detail="Request not found")
+
+        return RedirectResponse(url=f"/requests/{request_id}", status_code=303)
+
+    @ui_router.post("/requests/{request_id}/dismiss", response_class=HTMLResponse)
+    async def request_detail_dismiss(
+        request_id: str,
+        db: AsyncSession = Depends(get_session),
+    ) -> RedirectResponse:
+        request_obj, _ = await requests_service.dismiss_request(
+            db,
+            request_id=request_id,
         )
         if request_obj is None:
             raise HTTPException(status_code=404, detail="Request not found")

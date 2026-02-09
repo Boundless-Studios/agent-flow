@@ -122,6 +122,50 @@ async def list_requests(
     return list(result.scalars().all())
 
 
+async def dismiss_request(
+    db: AsyncSession,
+    *,
+    request_id: str,
+) -> tuple[InputRequest | None, bool]:
+    request_obj = await get_request(db, request_id)
+    if request_obj is None:
+        return None, False
+
+    if request_obj.status != RequestStatus.PENDING:
+        return request_obj, True
+
+    request_obj.status = RequestStatus.DISMISSED
+
+    session = await get_session(db, request_obj.session_id)
+    if session is not None:
+        remaining_pending_stmt = (
+            select(InputRequest.id)
+            .where(
+                InputRequest.session_id == request_obj.session_id,
+                InputRequest.status == RequestStatus.PENDING,
+                InputRequest.request_id != request_obj.request_id,
+            )
+            .limit(1)
+        )
+        remaining_pending_result = await db.execute(remaining_pending_stmt)
+        has_remaining_pending = remaining_pending_result.first() is not None
+        if not has_remaining_pending:
+            session.state = SessionState.WORKING
+            session.last_seen_at = _now()
+
+    await db.commit()
+    await db.refresh(request_obj)
+
+    await event_bus.publish(
+        "request.dismissed",
+        {
+            "request_id": request_obj.request_id,
+            "session_id": request_obj.session_id,
+        },
+    )
+    return request_obj, False
+
+
 async def respond_to_request(
     db: AsyncSession,
     *,

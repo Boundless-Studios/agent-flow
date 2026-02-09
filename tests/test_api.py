@@ -118,6 +118,53 @@ def test_idempotency_on_request_creation(client: TestClient) -> None:
     assert first.json()["request_id"] == second.json()["request_id"]
 
 
+def test_dismiss_request_flow(client: TestClient) -> None:
+    register = client.post("/api/sessions/register", json={"display_name": "Agent Dismiss"})
+    session_id = register.json()["session_id"]
+
+    first_request = client.post(
+        f"/api/sessions/{session_id}/requests",
+        json={"title": "Old prompt", "question": "Already handled externally"},
+    )
+    second_request = client.post(
+        f"/api/sessions/{session_id}/requests",
+        json={"title": "Active prompt", "question": "Still pending"},
+    )
+    first_request_id = first_request.json()["request_id"]
+    second_request_id = second_request.json()["request_id"]
+
+    dismiss_first = client.post(f"/api/requests/{first_request_id}/dismiss")
+    assert dismiss_first.status_code == 200
+    assert dismiss_first.json()["status"] == "DISMISSED"
+
+    sessions_after_first_dismiss = client.get("/api/sessions")
+    [session_after_first_dismiss] = [
+        item for item in sessions_after_first_dismiss.json() if item["session_id"] == session_id
+    ]
+    assert session_after_first_dismiss["state"] == "WAITING_FOR_INPUT"
+    assert session_after_first_dismiss["pending_request_count"] == 1
+
+    pending_requests = client.get("/api/requests", params={"status": "PENDING"}).json()
+    pending_request_ids = {item["request_id"] for item in pending_requests}
+    assert first_request_id not in pending_request_ids
+    assert second_request_id in pending_request_ids
+
+    dismiss_second = client.post(f"/api/requests/{second_request_id}/dismiss")
+    assert dismiss_second.status_code == 200
+    assert dismiss_second.json()["status"] == "DISMISSED"
+
+    sessions_after_second_dismiss = client.get("/api/sessions")
+    [session_after_second_dismiss] = [
+        item for item in sessions_after_second_dismiss.json() if item["session_id"] == session_id
+    ]
+    assert session_after_second_dismiss["state"] == "WORKING"
+    assert session_after_second_dismiss["pending_request_count"] == 0
+
+    first_request_view = client.get(f"/api/requests/{first_request_id}")
+    assert first_request_view.status_code == 200
+    assert first_request_view.json()["status"] == "DISMISSED"
+
+
 def test_requests_partial_preserves_multiline_format_and_context(client: TestClient) -> None:
     register = client.post("/api/sessions/register", json={"display_name": "Agent Gamma"})
     session_id = register.json()["session_id"]
@@ -140,3 +187,4 @@ def test_requests_partial_preserves_multiline_format_and_context(client: TestCli
     assert "item A" in body
     assert "request-context" in body
     assert "Context" in body
+    assert "inline-dismiss-button" in body
